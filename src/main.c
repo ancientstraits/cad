@@ -7,75 +7,32 @@
 #include <cglm/cglm.h>
 
 #include "error.h"
-#include "shader_util.h"
+#include "object.h"
+#include "primitive.h"
+#include "scene.h"
 
-static GLfloat vertices[] = {
-	0.5, 0.5, 1.0,
-	0.5, -0.5, 1.0,
-	-0.5, -0.5, 0.0,
-	-0.5, 0.5, 0.0,
-	//0.0, -0.5, 2.0,
-};
-
-static GLuint indices[] = {
-	0, 1, 2,
-	0, 2, 3,
-};
-
-const char* vert_shader =
-	"#version 330 core\n"
-
-	"layout (location = 0) in vec3 vp;"
-	"uniform mat4 view, projection;"
-
-	"void main() {"
-		"gl_Position = vec4(vp, 1.0) * view * projection;"
-	"}"
-;
+/*
 const char* frag_shader =
 	"#version 330 core\n"
 
-	"out vec4 frag_color;"
+	"out int val;"
 
 	"void main() {"
-		"frag_color = vec4(1.0, 1.0, 1.0, 1.0);"
+		"val = 5;"
 	"}"
 ;
-
-static GLuint make_ebo(GLuint* data, GLint n_indices) {
-	GLuint ebo;
-	glGenBuffers(1, &ebo);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)*n_indices, data, GL_STATIC_DRAW);
-
-	return ebo;
-}
-static GLuint make_vao(GLfloat* data, GLint n_verts) {
-	GLuint vao;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	GLuint vbo;
-	glGenBuffers(1, &vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*3*n_verts, data, GL_STATIC_DRAW);
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-
-	return vao;
-}
+*/
 
 float zx_angle = 0.0;
 float y_angle = 0.0;
+int move_mouse = 0;
+double mouse_pos[2] = {0, 0};
 static void on_key(GLFWwindow* window, int key, int scancode, int action, int mods) {
-	if (action == GLFW_PRESS || action == GLFW_REPEAT) {
-		if (key == GLFW_KEY_LEFT)  zx_angle -= 0.01;
-		if (key == GLFW_KEY_RIGHT) zx_angle += 0.01;
-
-		if (key == GLFW_KEY_UP)    y_angle -= 0.01;
-		if (key == GLFW_KEY_DOWN)  y_angle += 0.01;
+	if (action == GLFW_PRESS   && key == GLFW_KEY_LEFT_SHIFT) {
+		move_mouse = 1;
+		glfwGetCursorPos(window, &(mouse_pos[0]), &(mouse_pos[1]));
 	}
+	if (action == GLFW_RELEASE && key == GLFW_KEY_LEFT_SHIFT) move_mouse = 0;
 }
 
 int main() {
@@ -89,61 +46,74 @@ int main() {
 #endif
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	GLFWwindow *window = glfwCreateWindow(600, 400, "Tutorial 01", NULL, NULL);
+	GLFWwindow *window = glfwCreateWindow(600, 400, "evoCADive", NULL, NULL);
 	ASSERT(window, "Failed to created window");
 	glfwMakeContextCurrent(window);
-
 	glfwSetKeyCallback(window, on_key);
 
-	GLuint shader = shader_from_strings(vert_shader, frag_shader);
-	GLuint proj_loc = glGetUniformLocation(shader, "projection");
-	GLuint view_loc = glGetUniformLocation(shader, "view");
-	GLuint vao = make_vao(vertices, 4);
-	GLuint ebo = make_ebo(indices, 6);
+	glEnable(GL_DEPTH_TEST);
+
+	Object o;
+	box_create_centered(&o, (vec3){0.0, 0.0, 0.0}, (vec3){.1, .2, .3});
+
+	Scene s;
+	scene_create(&s, 600.0/400.0);
+	scene_add_object(&s, o);
+
+	GLuint fbo;
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	GLuint tex;
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 1, 1, 0, GL_RED, GL_INT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+	ASSERT(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "Framebuffer incomplete");
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	mat4 projection, view;
-	float aspect = 600.0/400.0;
-	glm_mat4_identity(projection);
-	glm_ortho(-aspect, aspect, -1.0, 1.0, -1.0, 1.0, projection);
-
-	/*
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 4; j++) {
-			printf("%f ", projection[i][j]);
-		}
-		printf("\n");
-	}
-	printf("\n");
+	float aspect = 600.0/400.0; // 1.5
+	glm_ortho(-aspect, aspect, -1.0, 1.0, -10.0, 10.0, projection);
 
 	vec4 test;
-	glm_mat4_mulv(projection, (vec4){0.5, 0.5, 5.0, 1.0}, test);
-	printf("(%f, %f, %f, %f)\n", test[0], test[1], test[2], test[3]);
-	*/
+	glm_mat4_mulv(projection, (vec4){0.5, 0.5, 1.0, 1.0}, test);
 
 	vec3 center = {0.0, 0.0, 0.0}, up = {0.0, 1.0, 0.0};
 
 	while (!glfwWindowShouldClose(window)) {
-		glClear(GL_COLOR_BUFFER_BIT);
-		glClearColor(0.0, 0.3, 0.3, 0.0);
+		if (move_mouse) {
+			const double mouse_mul = 0.01;
+			double new_pos[2];
+			glfwGetCursorPos(window, &(new_pos[0]), &(new_pos[1]));
+			zx_angle += mouse_mul * (new_pos[0] - mouse_pos[0]);
+			y_angle  += mouse_mul * (new_pos[1] - mouse_pos[1]);
 
-		glUseProgram(shader);
+			y_angle = glm_clamp(y_angle, -M_PI/2, M_PI/2);
 
-		printf("%f\n", zx_angle);
+			mouse_pos[0] = new_pos[0];
+			mouse_pos[1] = new_pos[1];
+		}
+
 		vec3 eye = {0.0, 0.0, -1.0};
-		glm_lookat(eye, center, up, view);
-		glm_rotate(view, zx_angle, (vec3){0.0, 1.0, 0.0});
+		glm_lookat(eye, center, up, s.view);
+		glm_rotate(s.view, y_angle, (vec3){-1.0, 0.0, 0.0});
+		glm_rotate(s.view, zx_angle, (vec3){0.0, 1.0, 0.0});
 
-		glUniformMatrix4fv(proj_loc, 1, GL_TRUE, projection[0]);
-		glUniformMatrix4fv(view_loc, 1, GL_FALSE, view[0]);
-
-		glBindVertexArray(vao);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		scene_draw(&s);
 
 		glfwPollEvents();
 		glfwSwapBuffers(window);
 	}
 
+	uint8_t px[3];
+	uint8_t val;
+	glReadPixels(0, 0, 1, 1, GL_RED, GL_INT, &val);
+	printf("%d\n", val);
+
+	scene_destroy(&s);
 	glfwTerminate();
 	return 0;
 }

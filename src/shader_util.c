@@ -12,7 +12,7 @@ static GLuint single_shader(GLuint type, const char* code) {
         int err_len;
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &err_len);
 
-        char err_msg[err_len + 1];
+        char err_msg[2048];
         glGetShaderInfoLog(shader, err_len, NULL, err_msg);
 
         DIE("Failed to compile shader %s: %s",
