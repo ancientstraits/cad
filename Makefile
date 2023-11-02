@@ -1,6 +1,6 @@
 LIBS = cglm epoxy glfw3
 
-CFLAGS = -g -ggdb -Iinclude -Wall -Werror=vla $(shell pkg-config --cflags $(LIBS))
+CFLAGS = -g -ggdb -Iinclude -Wall -Wshadow -Werror=vla $(shell pkg-config --cflags $(LIBS))
 LFLAGS = $(shell pkg-config --libs $(LIBS)) -lm
 
 OS = $(shell uname)

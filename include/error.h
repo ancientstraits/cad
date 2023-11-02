@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <epoxy/gl.h>
 
 #define ASSERT(cond, ...) if (!(cond)) DIE(__VA_ARGS__)
 
@@ -15,6 +16,12 @@
 #define DIE(...) do { \
 	LOG(__VA_ARGS__); \
 	abort(); \
+} while (0)
+
+
+#define GL() do { \
+	GLenum err = glGetError(); \
+	ASSERT(err == GL_NO_ERROR, "OpenGL Error: 0x%x", err); \
 } while (0)
 
 #endif // !ERR_H
