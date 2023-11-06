@@ -1,4 +1,4 @@
-# AncientCAD
+# Modeling The Future (MTF)
 This simple 3D CAD app lets you make an unlimited amount of cubes, select them, rotate them, scale them, and move them.
 You can also rotate the view.
 
